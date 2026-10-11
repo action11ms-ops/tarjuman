@@ -87,6 +87,11 @@ h2{font-family:var(--f-display);font-size:1.05rem;margin:0}
 .hist li{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
 .hist .t{flex:1;min-width:0}
 .hist .o{color:var(--muted);font-size:.85rem}
+.hist-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.btn.danger{background:transparent;color:var(--danger);border:1px solid var(--line);padding:6px 12px;font-size:.82rem}
+.btn.danger.armed{background:var(--danger);color:var(--on-accent);border-color:var(--danger)}
+.hist .acts{display:flex;gap:6px;flex:none}
+.hist .acts .btn{padding:6px 10px}
 .hist .tag{font-size:.72rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 .langs{display:flex;flex-wrap:wrap;gap:6px}
 .langs span{display:inline-flex;gap:6px;align-items:center;background:var(--sunk);padding:4px 10px;border-radius:99px;font-size:.85rem}
@@ -153,7 +158,7 @@ h2{font-family:var(--f-display);font-size:1.05rem;margin:0}
   </section>
 
   <section class="card">
-    <h2>سجل الترجمات</h2>
+    <div class="hist-head"><h2>سجل الترجمات</h2><button class="btn danger" id="histClear" hidden>حذف الكل</button></div>
     <ul class="hist" id="hist"></ul>
   </section>
 </div>
@@ -242,9 +247,14 @@ ${text}`;
     }
   }
   const url = "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl="+ALL[from].g+"&tl="+ALL[to].g+"&q="+encodeURIComponent(text);
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("net");
-  const data = await res.json();
+  if(!navigator.onLine) throw new Error("offline");
+  let data, lastErr;
+  for(let attempt=0; attempt<2 && !data; attempt++){
+    const ac=new AbortController(); const tm=setTimeout(()=>ac.abort(),9000);
+    try{ const res=await fetch(url,{signal:ac.signal}); if(!res.ok) throw new Error("http"); data=await res.json(); }
+    catch(e){ lastErr=e; } finally{ clearTimeout(tm); }
+  }
+  if(!data) throw lastErr||new Error("net");
   return data[0].map(x=>x[0]).join("");
 }
 
@@ -257,6 +267,7 @@ function voiceFor(code){
   return voices.find(v=>v.lang.toLowerCase().replace("_","-")===keys[0]) ||
          voices.find(v=>keys.some(k=>v.lang.toLowerCase().startsWith(k)));
 }
+const missingNoted=new Set();
 function speak(text, code){
   if(!text) return;
   if(!("speechSynthesis" in window)){ note("جهازك لا يدعم النطق الصوتي.",1); return; }
@@ -264,7 +275,7 @@ function speak(text, code){
   const u = new SpeechSynthesisUtterance(text);
   u.lang = ALL[code].sr; u.rate = state.rate;
   const v = voiceFor(code);
-  if(v) u.voice = v; else note("لا يوجد صوت مثبّت للغة "+ALL[code].n+" على جهازك. يمكنك إضافته من إعدادات الجهاز ← تسهيلات الاستخدام ← المحتوى المنطوق ← الأصوات.");
+  if(v) u.voice = v; else if(!missingNoted.has(code) && missingNoted.add(code)) note("لا يوجد صوت مثبّت للغة "+ALL[code].n+" على جهازك. يمكنك إضافته من إعدادات الجهاز ← تسهيلات الاستخدام ← المحتوى المنطوق ← الأصوات.");
   speechSynthesis.speak(u);
 }
 function renderVoiceInfo(){
@@ -277,7 +288,7 @@ function renderVoiceInfo(){
 
 /* ---------- speech recognition ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec=null, recBtn=null, srBlocked=false, skipFinal=false, wantStop=false;
+let rec=null, recBtn=null, srBlocked=false, skipFinal=false, wantStop=false, pendingStart=null;
 const IS_ANDROID=/Android/i.test(navigator.userAgent);
 function stopRec(){ if(rec){ skipFinal=true; wantStop=true; try{rec.stop()}catch(_){} } }
 function kbVoice(input){
@@ -285,12 +296,16 @@ function kbVoice(input){
   note("الآن اضغط 🎤 في أعلى لوحة المفاتيح وتحدّث، ثم اضغط «ترجم».");
 }
 function listen(code, btn, onInterim, onFinal, input){
-  if(rec){ wantStop=true; try{rec.stop()}catch(_){} return; }
+  if(rec){
+    pendingStart = recBtn===btn ? null : ()=>listen(code,btn,onInterim,onFinal,input);
+    wantStop=true; try{rec.stop()}catch(_){} return;
+  }
   if(!SR||srBlocked||!window.isSecureContext){ kbVoice(input); return; }
   try{ speechSynthesis.cancel(); }catch(e){}
   let acc="", first=true; wantStop=false; skipFinal=false;
   recBtn=btn; btn.classList.add("live");
-  const finish=()=>{ btn.classList.remove("live"); rec=null; if(!skipFinal && acc) onFinal(acc); skipFinal=false; };
+  const finish=()=>{ btn.classList.remove("live"); rec=null; recBtn=null; if(!skipFinal && acc) onFinal(acc); skipFinal=false;
+    if(pendingStart){ const f=pendingStart; pendingStart=null; setTimeout(f,200); } };
   const startSession=()=>{
     const r=new SR(); r.lang=ALL[code].sr; r.interimResults=true; r.continuous=false; r.maxAlternatives=1;
     let sess="";
@@ -329,7 +344,7 @@ function buildSide(key){
       <select id="lang-${key}" aria-label="لغة المتحدث">${opts(state[key])}</select>
       <button class="btn" id="rep-${key}" title="أعد النطق">🔊</button>
     </div>
-    <div class="bubble"><div class="orig" id="orig-${key}"></div><div class="tr placeholder" id="tr-${key}">${key==="a"?"ستظهر هنا ترجمة كلام الطرف الآخر.":"Translation of what the other person says will appear here."}</div></div>
+    <div class="bubble"><div class="orig" id="orig-${key}"></div><div class="tr placeholder" id="tr-${key}" aria-live="polite">${key==="a"?"ستظهر هنا ترجمة كلام الطرف الآخر.":"Translation of what the other person says will appear here."}</div></div>
     <div class="controls">
       <button class="mic" id="mic-${key}" aria-label="تحدّث">${MIC_SVG}</button>
       <form class="row" id="f-${key}"><input type="text" id="in-${key}" placeholder="${key==="a"?"اكتب أو اضغط الميكروفون…":"Type or tap the mic…"}" autocomplete="off"><button class="btn primary" type="submit">ترجم</button></form>
@@ -364,7 +379,11 @@ async function convoSend(from,to,text){
     tr.textContent=out; tr.dataset.text=out;
     addHist(text,out,src,dst);
     if(state.auto) speak(out,dst);
-  }catch(e){ tr.textContent=""; note("تعذّرت الترجمة. تحقق من الاتصال بالإنترنت ثم حاول مجدداً.",1); }
+  }catch(e){
+    tr.textContent=""; og.textContent="";
+    const inp=$("in-"+from); if(!inp.value.trim()) inp.value=text;
+    note(e&&e.message==="offline" ? "لا يوجد اتصال بالإنترنت. النص محفوظ في الخانة، اضغط «ترجم» عند عودة الاتصال." : "تعذّرت الترجمة. النص محفوظ في الخانة، اضغط «ترجم» للمحاولة مجدداً.",1);
+  }
 }
 
 /* ---------- text mode ---------- */
@@ -392,19 +411,29 @@ $("tCopy").onclick=async()=>{ const t=$("tOut").dataset.text||""; try{ await nav
 
 /* ---------- history ---------- */
 function addHist(o,t,f,to){ history.unshift({o,t,f,to,at:Date.now()}); history=history.slice(0,40); save(); renderHist(); }
+function delHist(at){ history=history.filter(h=>h.at!==at); save(); renderHist(); }
+let clearTimer;
+$("histClear").onclick=()=>{
+  const b=$("histClear");
+  if(!b.classList.contains("armed")){ b.classList.add("armed"); b.textContent="اضغط مرة أخرى للتأكيد"; clearTimeout(clearTimer);
+    clearTimer=setTimeout(()=>{ b.classList.remove("armed"); b.textContent="حذف الكل"; },4000); return; }
+  clearTimeout(clearTimer); history=[]; save(); b.classList.remove("armed"); b.textContent="حذف الكل"; renderHist(); note("حُذف السجل بالكامل.");
+};
 function renderHist(){
   const ul=$("hist");
+  $("histClear").hidden=!history.length;
   if(!history.length){ ul.innerHTML='<li><span class="o">لا توجد ترجمات بعد. ابدأ بالكتابة أو اضغط الميكروفون.</span></li>'; return; }
   ul.innerHTML="";
   history.forEach(h=>{
     if(!ALL[h.f]||!ALL[h.to]) return;
     const li=document.createElement("li");
     const d=new Date(h.at);
-    li.innerHTML=`<div class="t"><div class="o"></div><div class="x"></div></div><span class="tag"></span><button class="btn" aria-label="استمع">🔊</button>`;
+    li.innerHTML=`<div class="t"><div class="o"></div><div class="x"></div></div><span class="tag"></span><div class="acts"><button class="btn" data-a="say" aria-label="استمع">🔊</button><button class="btn" data-a="del" aria-label="حذف هذه الترجمة">✕</button></div>`;
     li.querySelector(".o").textContent=h.o; li.querySelector(".o").dir=ALL[h.f].rtl?"rtl":"ltr";
     li.querySelector(".x").textContent=h.t; li.querySelector(".x").dir=ALL[h.to].rtl?"rtl":"ltr";
     li.querySelector(".tag").textContent=h.f.toUpperCase()+" ← "+h.to.toUpperCase()+" · "+d.toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit"});
-    li.querySelector("button").onclick=()=>speak(h.t,h.to);
+    li.querySelector('[data-a="say"]').onclick=()=>speak(h.t,h.to);
+    li.querySelector('[data-a="del"]').onclick=()=>delHist(h.at);
     ul.appendChild(li);
   });
 }
@@ -429,6 +458,7 @@ $("rate").value=state.rate; $("rate").oninput=e=>{state.rate=+e.target.value;sav
 /* ---------- tabs & toggles ---------- */
 const tabs={convo:"p-convo",text:"p-text",set:"p-set"};
 Object.keys(tabs).forEach(k=>$("tab-"+k).onclick=()=>{
+  stopRec();
   Object.keys(tabs).forEach(j=>{ $("tab-"+j).setAttribute("aria-selected",j===k); $(tabs[j]).hidden=j!==k; });
 });
 $("autoSpeak").setAttribute("aria-pressed",state.auto);
@@ -441,4 +471,19 @@ $("clearConvo").onclick=()=>{ buildSide("a"); buildSide("b"); setDir(); };
 
 function refreshAll(){ buildSide("a"); buildSide("b"); setDir(); buildText(); renderLangs(); applyFlip(); }
 fixSel(); refreshAll(); renderHist();
+
+/* keep the screen on during a conversation */
+let wakeLock=null;
+async function keepAwake(){ try{ if("wakeLock" in navigator && document.visibilityState==="visible" && !wakeLock){ wakeLock=await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release",()=>{wakeLock=null}); } }catch(e){} }
+document.addEventListener("pointerdown",keepAwake,{passive:true});
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") keepAwake(); else stopRec(); });
+
+/* installable app + offline shell, only on the public site */
+if(location.hostname.endsWith("github.io")){
+  try{
+    const l=document.createElement("link"); l.rel="manifest"; l.href="manifest.webmanifest"; document.head.appendChild(l);
+    const a=document.createElement("link"); a.rel="apple-touch-icon"; a.href="icon-192.png"; document.head.appendChild(a);
+    if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }catch(e){}
+}
 </script>
