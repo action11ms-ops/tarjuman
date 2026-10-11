@@ -1,0 +1,434 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ترجمان الفوري</title>
+<meta name="description" content="مترجم فوري للمحادثة وجهاً لوجه: كتابة وصوت بين العربية والإنجليزية والفلبينية والإندونيسية والأمهرية">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@500;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Noto+Sans+Ethiopic:wght@400;600&display=swap">
+<style>
+/* Layout: a counter-top interpreter — two facing speaker panels (top one can flip 180°), text mode and history below */
+:root{
+  --bg:#EEF2EF; --surface:#FFFFFF; --sunk:#E3E9E5; --line:#CDD8D2;
+  --ink:#13302A; --muted:#5B6F69;
+  --a:#0D7A63; --a-soft:#D6EEE7; --b:#B8641A; --b-soft:#F6E5D3;
+  --danger:#B3261E; --on-accent:#FFFFFF;
+  --f-display:"Readex Pro","IBM Plex Sans Arabic",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans Arabic","Noto Sans Ethiopic",system-ui,sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1614; --surface:#16211E; --sunk:#1D2A26; --line:#2B3B36;
+  --ink:#E4EDEA; --muted:#93A6A0;
+  --a:#3DC4A2; --a-soft:#173A31; --b:#F0A04B; --b-soft:#3A2A18;
+  --danger:#F2867E; --on-accent:#0E1614; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1614; --surface:#16211E; --sunk:#1D2A26; --line:#2B3B36;
+  --ink:#E4EDEA; --muted:#93A6A0;
+  --a:#3DC4A2; --a-soft:#173A31; --b:#F0A04B; --b-soft:#3A2A18;
+  --danger:#F2867E; --on-accent:#0E1614; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:18px 40px;display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-size:1.6rem;margin:0;letter-spacing:-.01em}
+h1 small{display:block;font-family:var(--f-body);font-size:.8rem;font-weight:400;color:var(--muted)}
+.engine{font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--sunk);color:var(--muted)}
+.engine b{color:var(--a)}
+.tabs{display:flex;gap:6px;background:var(--sunk);padding:4px;border-radius:12px}
+.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:600 .95rem var(--f-body);padding:10px;border-radius:9px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px #0002}
+button{font-family:var(--f-body)}
+button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+select,textarea,input[type=text]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+textarea{width:100%;resize:vertical;min-height:84px}
+
+/* conversation */
+.convo{display:flex;flex-direction:column;gap:10px}
+.side{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;--c:var(--a);--cs:var(--a-soft)}
+.side.b{--c:var(--b);--cs:var(--b-soft)}
+.side.flipped{transform:rotate(180deg)}
+.side-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.who{font:600 .75rem var(--f-body);letter-spacing:.06em;color:var(--c);background:var(--cs);padding:3px 9px;border-radius:99px}
+.side-top select{flex:1;min-width:140px}
+.bubble{min-height:96px;background:var(--cs);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.bubble .orig{font-size:.85rem;color:var(--muted);min-height:1.2em}
+.bubble .tr{font-family:var(--f-display);font-size:1.45rem;line-height:1.45;font-weight:500;overflow-wrap:anywhere}
+.bubble .tr.placeholder{font-family:var(--f-body);font-size:.95rem;color:var(--muted);font-weight:400}
+.row{display:flex;gap:8px;align-items:stretch}
+.row input{flex:1;min-width:0}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:600;font-size:.9rem;cursor:pointer;background:var(--sunk);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--c,var(--a));color:var(--on-accent)}
+.mic{width:56px;height:56px;border-radius:50%;border:0;background:var(--c);color:var(--on-accent);cursor:pointer;display:grid;place-items:center;flex:none}
+.mic svg{width:24px;height:24px}
+.mic.live{animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 55%,transparent)}100%{box-shadow:0 0 0 16px transparent}}
+@media (prefers-reduced-motion:reduce){.mic.live{animation:none;outline:3px solid var(--c)}}
+.controls{display:flex;gap:10px;align-items:center}
+.controls .row{flex:1}
+.mid{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:99px;padding:6px 12px;font-size:.82rem;cursor:pointer}
+.chip[aria-pressed="true"]{color:var(--ink);border-color:var(--a);background:var(--a-soft)}
+
+/* text mode */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px}
+.pair{display:flex;gap:8px;align-items:center}
+.pair select{flex:1;min-width:0}
+.swap{width:42px;height:42px;border-radius:50%;flex:none}
+.out{min-height:96px;background:var(--a-soft);border-radius:12px;padding:12px 14px;font-family:var(--f-display);font-size:1.25rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.out.placeholder{font-family:var(--f-body);font-size:.95rem;color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.note{font-size:.85rem;padding:10px 12px;border-radius:10px;background:var(--sunk);color:var(--muted)}
+.note.warn{color:var(--danger)}
+h2{font-family:var(--f-display);font-size:1.05rem;margin:0}
+.hist{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.hist li{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.hist .t{flex:1;min-width:0}
+.hist .o{color:var(--muted);font-size:.85rem}
+.hist .tag{font-size:.72rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.langs{display:flex;flex-wrap:wrap;gap:6px}
+.langs span{display:inline-flex;gap:6px;align-items:center;background:var(--sunk);padding:4px 10px;border-radius:99px;font-size:.85rem}
+.langs button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0;font-size:1rem;line-height:1}
+.settings-row{display:flex;gap:8px;flex-wrap:wrap}
+.settings-row select{flex:1;min-width:160px}
+[dir=ltr]{text-align:left}
+</style>
+
+<div class="wrap" dir="rtl">
+  <header>
+    <h1>ترجمان<small>ترجمة فورية للتعامل المباشر</small></h1>
+    <span class="engine" id="engine">جارٍ تجهيز المحرك…</span>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-convo" aria-selected="true">محادثة وجهاً لوجه</button>
+    <button role="tab" id="tab-text" aria-selected="false">ترجمة نص</button>
+    <button role="tab" id="tab-set" aria-selected="false">اللغات والإعدادات</button>
+  </div>
+
+  <div id="note" class="note" hidden></div>
+
+  <!-- CONVERSATION -->
+  <section id="p-convo" class="convo">
+    <div class="side b" id="sideB"></div>
+    <div class="mid">
+      <button class="chip" id="flipBtn" aria-pressed="false">اقلب لوحة الطرف المقابل</button>
+      <button class="chip" id="autoSpeak" aria-pressed="true">النطق التلقائي للترجمة</button>
+      <button class="chip" id="autoSend" aria-pressed="true">ترجمة تلقائية عند التوقف</button>
+      <button class="chip" id="clearConvo">مسح</button>
+    </div>
+    <div class="side a" id="sideA"></div>
+  </section>
+
+  <!-- TEXT -->
+  <section id="p-text" class="card" hidden>
+    <div class="pair">
+      <select id="tFrom" aria-label="من لغة"></select>
+      <button class="btn swap" id="tSwap" aria-label="تبديل اللغتين">⇄</button>
+      <select id="tTo" aria-label="إلى لغة"></select>
+    </div>
+    <textarea id="tIn" placeholder="اكتب النص هنا…"></textarea>
+    <div class="actions">
+      <button class="btn primary" id="tGo">ترجم</button>
+      <button class="btn" id="tMic">🎙 إملاء بالصوت</button>
+      <button class="btn" id="tSpeak">🔊 استمع</button>
+      <button class="btn" id="tCopy">نسخ</button>
+    </div>
+    <div class="out placeholder" id="tOut">ستظهر الترجمة هنا.</div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="p-set" class="card" hidden>
+    <h2>اللغات المفعّلة</h2>
+    <div class="langs" id="langList"></div>
+    <div class="settings-row">
+      <select id="addSel" aria-label="لغة لإضافتها"></select>
+      <button class="btn primary" id="addBtn">أضف اللغة</button>
+    </div>
+    <h2>سرعة النطق</h2>
+    <input type="range" id="rate" min="0.6" max="1.3" step="0.05" value="0.95" aria-label="سرعة النطق">
+    <div class="note" id="voiceInfo"></div>
+  </section>
+
+  <section class="card">
+    <h2>سجل الترجمات</h2>
+    <ul class="hist" id="hist"></ul>
+  </section>
+</div>
+
+<script>
+const ALL = {
+  ar:{n:"العربية",sr:"ar-SA",g:"ar",rtl:1},
+  en:{n:"English الإنجليزية",sr:"en-US",g:"en"},
+  fil:{n:"Filipino الفلبينية",sr:"fil-PH",g:"tl",alt:["tl"]},
+  id:{n:"Bahasa Indonesia الإندونيسية",sr:"id-ID",g:"id"},
+  am:{n:"አማርኛ الأمهرية",sr:"am-ET",g:"am"},
+  ur:{n:"اردو الأردية",sr:"ur-PK",g:"ur",rtl:1},
+  hi:{n:"हिन्दी الهندية",sr:"hi-IN",g:"hi"},
+  bn:{n:"বাংলা البنغالية",sr:"bn-BD",g:"bn"},
+  ne:{n:"नेपाली النيبالية",sr:"ne-NP",g:"ne"},
+  si:{n:"සිංහල السنهالية",sr:"si-LK",g:"si"},
+  ta:{n:"தமிழ் التاميلية",sr:"ta-IN",g:"ta"},
+  ml:{n:"മലയാളം المالايالامية",sr:"ml-IN",g:"ml"},
+  ti:{n:"ትግርኛ التغرينية",sr:"ti-ET",g:"ti"},
+  so:{n:"Soomaali الصومالية",sr:"so-SO",g:"so"},
+  sw:{n:"Kiswahili السواحيلية",sr:"sw-KE",g:"sw"},
+  om:{n:"Afaan Oromoo الأورومية",sr:"om-ET",g:"om"},
+  fa:{n:"فارسی الفارسية",sr:"fa-IR",g:"fa",rtl:1},
+  ps:{n:"پښتو البشتو",sr:"ps-AF",g:"ps",rtl:1},
+  tr:{n:"Türkçe التركية",sr:"tr-TR",g:"tr"},
+  fr:{n:"Français الفرنسية",sr:"fr-FR",g:"fr"},
+  es:{n:"Español الإسبانية",sr:"es-ES",g:"es"},
+  de:{n:"Deutsch الألمانية",sr:"de-DE",g:"de"},
+  it:{n:"Italiano الإيطالية",sr:"it-IT",g:"it"},
+  pt:{n:"Português البرتغالية",sr:"pt-BR",g:"pt"},
+  ru:{n:"Русский الروسية",sr:"ru-RU",g:"ru"},
+  zh:{n:"中文 الصينية",sr:"zh-CN",g:"zh-CN"},
+  ja:{n:"日本語 اليابانية",sr:"ja-JP",g:"ja"},
+  ko:{n:"한국어 الكورية",sr:"ko-KR",g:"ko"},
+  th:{n:"ไทย التايلاندية",sr:"th-TH",g:"th"},
+  vi:{n:"Tiếng Việt الفيتنامية",sr:"vi-VN",g:"vi"},
+  ms:{n:"Bahasa Melayu الملايوية",sr:"ms-MY",g:"ms"},
+  my:{n:"မြန်မာ البورمية",sr:"my-MM",g:"my"},
+};
+const NAME_EN = {ar:"Arabic",en:"English",fil:"Filipino (Tagalog)",id:"Indonesian",am:"Amharic",ur:"Urdu",hi:"Hindi",bn:"Bengali",ne:"Nepali",si:"Sinhala",ta:"Tamil",ml:"Malayalam",ti:"Tigrinya",so:"Somali",sw:"Swahili",om:"Oromo",fa:"Persian",ps:"Pashto",tr:"Turkish",fr:"French",es:"Spanish",de:"German",it:"Italian",pt:"Portuguese",ru:"Russian",zh:"Chinese (Simplified)",ja:"Japanese",ko:"Korean",th:"Thai",vi:"Vietnamese",ms:"Malay",my:"Burmese"};
+const DEFAULT = ["ar","en","fil","id","am"];
+
+const store = {
+  get(k,d){try{const v=localStorage.getItem("tj_"+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("tj_"+k,JSON.stringify(v))}catch(e){}}
+};
+let enabled = store.get("langs",DEFAULT).filter(c=>ALL[c]);
+if(!enabled.length) enabled=[...DEFAULT];
+let state = Object.assign({a:"ar",b:"en",tFrom:"ar",tTo:"en",auto:true,autoSend:true,flip:false,rate:.95}, store.get("state",{}));
+let history = store.get("hist",[]);
+const $ = id=>document.getElementById(id);
+const save = ()=>{store.set("state",state);store.set("langs",enabled);store.set("hist",history.slice(0,40))};
+
+/* ---------- note ---------- */
+let noteT;
+function note(msg,warn){const n=$("note");n.textContent=msg;n.className="note"+(warn?" warn":"");n.hidden=false;clearTimeout(noteT);noteT=setTimeout(()=>n.hidden=true,7000)}
+
+/* ---------- translation engines ---------- */
+let sampleFn = null;
+function setEngine(){ $("engine").innerHTML = sampleFn ? "المحرك: <b>Claude</b> · دقة عالية" : "المحرك: <b>ترجمة سحابية</b>"; }
+setEngine();
+(async()=>{try{ if(window.claude?.use){ sampleFn = await window.claude.use("sample"); } }catch(e){} setEngine();})();
+
+async function translate(text, from, to, onPartial){
+  text = text.trim(); if(!text) return "";
+  if(from===to) return text;
+  if(sampleFn){
+    try{
+      const prompt = `You are a professional live interpreter for face-to-face conversations (e.g. reception desks, shops, clinics, workers and customers in Saudi Arabia).
+Translate the text below from ${NAME_EN[from]} to ${NAME_EN[to]}.
+Rules:
+- Output ONLY the translation, nothing else: no quotes, notes, transliteration or explanations.
+- Preserve meaning, tone, politeness, numbers, names, prices and times exactly.
+- Use natural, everyday spoken language that a native speaker would use.
+- If the source contains dialect (e.g. Saudi/Gulf Arabic or Taglish), understand it correctly.
+- When translating into Arabic, use clear Modern Standard Arabic suitable for speech.
+- When translating into Amharic, use Ge'ez (Ethiopic) script.
+${(/[؀-ۿ]/.test(text) && !ALL[from].rtl) ? `- IMPORTANT: The speaker spoke ${NAME_EN[from]}, but the voice keyboard wrote it phonetically in Arabic letters (e.g. "هاو ار يو" = "how are you"). First reconstruct the ${NAME_EN[from]} sentence from the sounds, then translate it.\n` : ""}Text:
+${text}`;
+      const r = await sampleFn(prompt,{modelTier:"default",cache:false,onText:({text:t})=>onPartial&&t&&onPartial(t)});
+      return (r.text||"").trim();
+    }catch(e){
+      if(e?.code==="not_granted"){ sampleFn=null; setEngine(); }
+      else if(e?.code==="rate_limited"){ note("كثرت الطلبات، استخدمت المحرك السحابي البديل لهذه الجملة."); }
+    }
+  }
+  const url = "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl="+ALL[from].g+"&tl="+ALL[to].g+"&q="+encodeURIComponent(text);
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("net");
+  const data = await res.json();
+  return data[0].map(x=>x[0]).join("");
+}
+
+/* ---------- speech synthesis ---------- */
+let voices=[];
+function loadVoices(){ try{ voices = speechSynthesis.getVoices()||[]; }catch(e){ voices=[] } renderVoiceInfo(); }
+if("speechSynthesis" in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+function voiceFor(code){
+  const keys=[ALL[code].sr.toLowerCase(), code, ...(ALL[code].alt||[])];
+  return voices.find(v=>v.lang.toLowerCase().replace("_","-")===keys[0]) ||
+         voices.find(v=>keys.some(k=>v.lang.toLowerCase().startsWith(k)));
+}
+function speak(text, code){
+  if(!text) return;
+  if(!("speechSynthesis" in window)){ note("جهازك لا يدعم النطق الصوتي.",1); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = ALL[code].sr; u.rate = state.rate;
+  const v = voiceFor(code);
+  if(v) u.voice = v; else note("لا يوجد صوت مثبّت للغة "+ALL[code].n+" على جهازك. يمكنك إضافته من إعدادات الجهاز ← تسهيلات الاستخدام ← المحتوى المنطوق ← الأصوات.");
+  speechSynthesis.speak(u);
+}
+function renderVoiceInfo(){
+  const el=$("voiceInfo"); if(!el) return;
+  const miss = enabled.filter(c=>!voiceFor(c)).map(c=>ALL[c].n);
+  el.textContent = !("speechSynthesis" in window) ? "النطق الصوتي غير مدعوم في هذا المتصفح." :
+    miss.length ? "لغات بدون صوت مثبّت على هذا الجهاز: "+miss.join("، ")+". الترجمة الكتابية تعمل لها بشكل كامل." :
+    "كل اللغات المفعّلة لها صوت على هذا الجهاز.";
+}
+
+/* ---------- speech recognition ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec=null, recBtn=null, srBlocked=false;
+function kbVoice(input){
+  if(input){ input.focus(); }
+  note("الآن اضغط 🎤 في أعلى لوحة المفاتيح وتحدّث. عندما تتوقف ثانيتين تُترجم كلماتك وتُنطق تلقائياً.");
+}
+function listen(code, btn, onInterim, onFinal, input){
+  if(rec){ rec.stop(); return; }
+  if(!SR||srBlocked||!window.isSecureContext){ kbVoice(input); return; }
+  try{ speechSynthesis.cancel(); }catch(e){}
+  rec = new SR(); rec.lang = ALL[code].sr; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives=1;
+  let finalText="";
+  recBtn=btn; btn.classList.add("live");
+  rec.onresult = e=>{
+    let interim="";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      if(e.results[i].isFinal) finalText+=t; else interim+=t;
+    }
+    onInterim(finalText+interim);
+  };
+  rec.onerror = e=>{
+    if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="network"||e.error==="audio-capture"){
+      srBlocked=true; kbVoice(input); }
+    else if(e.error==="language-not-supported")
+      note("التعرّف الصوتي لا يدعم "+ALL[code].n+" على هذا الجهاز. اكتب النص بدلاً من ذلك.",1);
+    else if(e.error!=="no-speech"&&e.error!=="aborted") note("تعذّر الاستماع: "+e.error,1);
+  };
+  rec.onend = ()=>{ btn.classList.remove("live"); rec=null; if(finalText.trim()) onFinal(finalText.trim()); };
+  let started=false;
+  rec.onstart=()=>{ started=true; };
+  try{ rec.start(); }catch(e){ btn.classList.remove("live"); rec=null; srBlocked=true; kbVoice(input); return; }
+  setTimeout(()=>{ if(!started&&rec){ try{rec.abort()}catch(e){} btn.classList.remove("live"); rec=null; srBlocked=true; kbVoice(input); } },1500);
+}
+
+/* ---------- conversation ---------- */
+const MIC_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+function opts(sel){ return enabled.map(c=>`<option value="${c}" ${c===sel?"selected":""}>${ALL[c].n}</option>`).join(""); }
+function buildSide(key){
+  const el=$(key==="a"?"sideA":"sideB");
+  el.innerHTML=`
+    <div class="side-top">
+      <span class="who">${key==="a"?"أنت":"الطرف الآخر"}</span>
+      <select id="lang-${key}" aria-label="لغة المتحدث">${opts(state[key])}</select>
+      <button class="btn" id="rep-${key}" title="أعد النطق">🔊</button>
+    </div>
+    <div class="bubble"><div class="orig" id="orig-${key}"></div><div class="tr placeholder" id="tr-${key}">${key==="a"?"ستظهر هنا ترجمة كلام الطرف الآخر.":"Translation of what the other person says will appear here."}</div></div>
+    <div class="controls">
+      <button class="mic" id="mic-${key}" aria-label="تحدّث">${MIC_SVG}</button>
+      <form class="row" id="f-${key}"><input type="text" id="in-${key}" placeholder="${key==="a"?"اكتب أو اضغط الميكروفون…":"Type or tap the mic…"}" autocomplete="off"><button class="btn primary" type="submit">ترجم</button></form>
+    </div>`;
+  const other = key==="a"?"b":"a";
+  $("lang-"+key).onchange=e=>{state[key]=e.target.value; save(); setDir();};
+  $("f-"+key).onsubmit=e=>{e.preventDefault(); const v=$("in-"+key).value; $("in-"+key).value=""; convoSend(key,other,v);};
+  $("mic-"+key).onclick=()=>listen(state[key],$("mic-"+key),
+    t=>{ $("in-"+key).value=t; },
+    t=>{ $("in-"+key).value=""; convoSend(key,other,t); }, $("in-"+key));
+  let deb;
+  $("in-"+key).addEventListener("input",()=>{
+    clearTimeout(deb);
+    if(!state.autoSend||rec) return;
+    deb=setTimeout(()=>{ const v=$("in-"+key).value; if(v.trim()){ $("in-"+key).value=""; convoSend(key,other,v); } },1700);
+  });
+  $("rep-"+key).onclick=()=>{ const t=$("tr-"+key).dataset.text; if(t) speak(t,state[key]); };
+}
+function setDir(){
+  ["a","b"].forEach(k=>{ const r=ALL[state[k]].rtl; $("tr-"+k).dir=r?"rtl":"ltr"; $("in-"+k).dir=r?"rtl":"ltr"; });
+}
+async function convoSend(from,to,text){
+  text=text.trim(); if(!text) return;
+  const tr=$("tr-"+to), og=$("orig-"+to), src=state[from], dst=state[to];
+  const arabicScript=/[؀-ۿ]/.test(text), ethiopic=/[ሀ-፿]/.test(text);
+  if(arabicScript && !ALL[src].rtl){
+    note("الكلام كُتب بحروف عربية بينما لغة هذا الطرف "+ALL[src].n+". قبل الضغط على 🎤 بدّل لغة لوحة المفاتيح بزر 🌐 إلى لغة المتحدث.",1);
+  }
+  og.textContent=text; tr.classList.remove("placeholder"); tr.textContent="…";
+  try{
+    const out = await translate(text,src,dst,p=>tr.textContent=p);
+    tr.textContent=out; tr.dataset.text=out;
+    addHist(text,out,src,dst);
+    if(state.auto) speak(out,dst);
+  }catch(e){ tr.textContent=""; note("تعذّرت الترجمة. تحقق من الاتصال بالإنترنت ثم حاول مجدداً.",1); }
+}
+
+/* ---------- text mode ---------- */
+function buildText(){
+  $("tFrom").innerHTML=opts(state.tFrom); $("tTo").innerHTML=opts(state.tTo);
+  setTextDir();
+}
+function setTextDir(){ $("tIn").dir=ALL[state.tFrom].rtl?"rtl":"ltr"; $("tOut").dir=ALL[state.tTo].rtl?"rtl":"ltr"; }
+$("tFrom").onchange=e=>{state.tFrom=e.target.value;save();setTextDir()};
+$("tTo").onchange=e=>{state.tTo=e.target.value;save();setTextDir()};
+$("tSwap").onclick=()=>{[state.tFrom,state.tTo]=[state.tTo,state.tFrom]; const o=$("tOut").dataset.text; if(o){ $("tIn").value=o; } buildText(); save();};
+let tTimer;
+async function doText(){
+  const v=$("tIn").value; if(!v.trim()) return;
+  const out=$("tOut"); out.classList.remove("placeholder"); out.textContent="…";
+  try{ const r=await translate(v,state.tFrom,state.tTo,p=>out.textContent=p); out.textContent=r; out.dataset.text=r; addHist(v,r,state.tFrom,state.tTo); }
+  catch(e){ out.textContent=""; note("تعذّرت الترجمة. تحقق من الاتصال ثم حاول مجدداً.",1); }
+}
+$("tGo").onclick=doText;
+$("tIn").addEventListener("keydown",e=>{ if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)) doText(); });
+$("tMic").onclick=()=>listen(state.tFrom,$("tMic"),t=>$("tIn").value=t,t=>{ $("tIn").value=t; doText(); },$("tIn"));
+$("tIn").addEventListener("input",()=>{ clearTimeout(tTimer); if(state.autoSend&&!rec) tTimer=setTimeout(doText,1700); });
+$("tSpeak").onclick=()=>speak($("tOut").dataset.text,state.tTo);
+$("tCopy").onclick=async()=>{ const t=$("tOut").dataset.text||""; try{ await navigator.clipboard.writeText(t); note("نُسخت الترجمة."); }catch(e){ const r=document.createRange(); r.selectNodeContents($("tOut")); const s=getSelection(); s.removeAllRanges(); s.addRange(r); note("حدّد النص وانسخه يدوياً."); } };
+
+/* ---------- history ---------- */
+function addHist(o,t,f,to){ history.unshift({o,t,f,to,at:Date.now()}); history=history.slice(0,40); save(); renderHist(); }
+function renderHist(){
+  const ul=$("hist");
+  if(!history.length){ ul.innerHTML='<li><span class="o">لا توجد ترجمات بعد. ابدأ بالكتابة أو اضغط الميكروفون.</span></li>'; return; }
+  ul.innerHTML="";
+  history.forEach(h=>{
+    if(!ALL[h.f]||!ALL[h.to]) return;
+    const li=document.createElement("li");
+    const d=new Date(h.at);
+    li.innerHTML=`<div class="t"><div class="o"></div><div class="x"></div></div><span class="tag"></span><button class="btn" aria-label="استمع">🔊</button>`;
+    li.querySelector(".o").textContent=h.o; li.querySelector(".o").dir=ALL[h.f].rtl?"rtl":"ltr";
+    li.querySelector(".x").textContent=h.t; li.querySelector(".x").dir=ALL[h.to].rtl?"rtl":"ltr";
+    li.querySelector(".tag").textContent=h.f.toUpperCase()+" ← "+h.to.toUpperCase()+" · "+d.toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit"});
+    li.querySelector("button").onclick=()=>speak(h.t,h.to);
+    ul.appendChild(li);
+  });
+}
+
+/* ---------- settings ---------- */
+function renderLangs(){
+  $("langList").innerHTML="";
+  enabled.forEach(c=>{
+    const s=document.createElement("span"); s.textContent=ALL[c].n;
+    if(enabled.length>2){ const b=document.createElement("button"); b.textContent="×"; b.setAttribute("aria-label","إزالة "+ALL[c].n);
+      b.onclick=()=>{ enabled=enabled.filter(x=>x!==c); fixSel(); save(); refreshAll(); }; s.appendChild(b); }
+    $("langList").appendChild(s);
+  });
+  $("addSel").innerHTML=Object.keys(ALL).filter(c=>!enabled.includes(c)).map(c=>`<option value="${c}">${ALL[c].n}</option>`).join("");
+  $("addBtn").disabled=!$("addSel").options.length;
+  renderVoiceInfo();
+}
+function fixSel(){ ["a","b","tFrom","tTo"].forEach(k=>{ if(!enabled.includes(state[k])) state[k]=enabled[k==="a"||k==="tFrom"?0:1]; }); }
+$("addBtn").onclick=()=>{ const c=$("addSel").value; if(c&&!enabled.includes(c)){ enabled.push(c); save(); refreshAll(); note("أُضيفت "+ALL[c].n+"."); } };
+$("rate").value=state.rate; $("rate").oninput=e=>{state.rate=+e.target.value;save()};
+
+/* ---------- tabs & toggles ---------- */
+const tabs={convo:"p-convo",text:"p-text",set:"p-set"};
+Object.keys(tabs).forEach(k=>$("tab-"+k).onclick=()=>{
+  Object.keys(tabs).forEach(j=>{ $("tab-"+j).setAttribute("aria-selected",j===k); $(tabs[j]).hidden=j!==k; });
+});
+$("autoSpeak").setAttribute("aria-pressed",state.auto);
+$("autoSpeak").onclick=()=>{ state.auto=!state.auto; $("autoSpeak").setAttribute("aria-pressed",state.auto); save(); };
+$("autoSend").setAttribute("aria-pressed",state.autoSend);
+$("autoSend").onclick=()=>{ state.autoSend=!state.autoSend; $("autoSend").setAttribute("aria-pressed",state.autoSend); save(); };
+function applyFlip(){ $("sideB").classList.toggle("flipped",state.flip); $("flipBtn").setAttribute("aria-pressed",state.flip); }
+$("flipBtn").onclick=()=>{ state.flip=!state.flip; applyFlip(); save(); };
+$("clearConvo").onclick=()=>{ buildSide("a"); buildSide("b"); setDir(); };
+
+function refreshAll(){ buildSide("a"); buildSide("b"); setDir(); buildText(); renderLangs(); applyFlip(); }
+fixSel(); refreshAll(); renderHist();
+</script>
