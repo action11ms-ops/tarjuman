@@ -303,9 +303,9 @@ function listen(code, btn, onInterim, onFinal, input){
   };
   rec.onend = ()=>{ btn.classList.remove("live"); rec=null; if(finalText.trim()) onFinal(finalText.trim()); };
   let started=false;
-  rec.onstart=()=>{ started=true; };
+  rec.onstart=()=>{ started=true; note("🎙 أستمع الآن بلغة: "+ALL[code].n+" — تكلّم ثم توقف."); };
   try{ rec.start(); }catch(e){ btn.classList.remove("live"); rec=null; srBlocked=true; kbVoice(input); return; }
-  setTimeout(()=>{ if(!started&&rec){ try{rec.abort()}catch(e){} btn.classList.remove("live"); rec=null; srBlocked=true; kbVoice(input); } },1500);
+  if(!window.isSecureContext) setTimeout(()=>{ if(!started&&rec){ try{rec.abort()}catch(e){} btn.classList.remove("live"); rec=null; srBlocked=true; kbVoice(input); } },1500);
 }
 
 /* ---------- conversation ---------- */
