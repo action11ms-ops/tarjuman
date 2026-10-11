@@ -1,5 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
 <title>ترجمان الفوري</title>
 <meta name="description" content="مترجم فوري للمحادثة وجهاً لوجه: كتابة وصوت بين العربية والإنجليزية والفلبينية والإندونيسية والأمهرية">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@500;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Noto+Sans+Ethiopic:wght@400;600&display=swap">
@@ -93,6 +94,7 @@ h2{font-family:var(--f-display);font-size:1.05rem;margin:0}
 .hist .acts{display:flex;gap:6px;flex:none}
 .hist .acts .btn{padding:6px 10px}
 .hist .tag{font-size:.72rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.diag{white-space:pre-wrap;font:.8rem/1.6 ui-monospace,monospace;background:var(--sunk);color:var(--ink);padding:10px 12px;border-radius:10px;margin:0;direction:ltr;text-align:left;overflow-x:auto}
 .langs{display:flex;flex-wrap:wrap;gap:6px}
 .langs span{display:inline-flex;gap:6px;align-items:center;background:var(--sunk);padding:4px 10px;border-radius:99px;font-size:.85rem}
 .langs button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0;font-size:1rem;line-height:1}
@@ -155,6 +157,16 @@ h2{font-family:var(--f-display);font-size:1.05rem;margin:0}
     <h2>سرعة النطق</h2>
     <input type="range" id="rate" min="0.6" max="1.3" step="0.05" value="0.95" aria-label="سرعة النطق">
     <div class="note" id="voiceInfo"></div>
+    <h2>مصدر صوت الترجمة</h2>
+    <div class="settings-row">
+      <select id="ttsMode" aria-label="مصدر صوت الترجمة">
+        <option value="auto">تلقائي (صوت Google، وإن فشل فصوت الجهاز)</option>
+        <option value="cloud">صوت Google السحابي دائماً</option>
+        <option value="device">صوت الجهاز فقط</option>
+      </select>
+      <button class="btn primary" id="ttsTest">فحص الصوت</button>
+    </div>
+    <pre class="diag" id="diag" hidden></pre>
   </section>
 
   <section class="card">
@@ -336,17 +348,18 @@ async function speak(text, code){
   stopSpeaking();
   await waitRecIdle();                     /* let the microphone release the audio first */
   if(seq!==speakSeq) return;
+  const mode=state.ttsMode||"auto";
   const v=("speechSynthesis" in window) ? voiceFor(code) : null;
-  if(v && !forceCloud.has(code)){
-    if(await localSpeak(text,code,v,seq)) return;
-    forceCloud.add(code);                  /* device voice failed silently: use the cloud voice from now on */
+  /* auto: Google voice first (same clear voice on every device, all languages), device voice as backup */
+  if(mode!=="device"){
+    if(await cloudSpeak(text,code,seq)) return;
+    if(seq!==speakSeq) return;
   }
-  if(seq!==speakSeq) return;
-  if(await cloudSpeak(text,code,seq)) return;
-  if(seq!==speakSeq) return;
-  if(v && forceCloud.has(code)){ forceCloud.delete(code); if(await localSpeak(text,code,v,seq)) return; }
-  if(!missingNoted.has(code)){ missingNoted.add(code);
-    note("تعذّر نطق الترجمة بلغة "+ALL[code].n+". تأكد من رفع صوت الجهاز، ثم اضغط 🔊 للاستماع. إن استمرت المشكلة ثبّت «خدمات التحويل من نص إلى كلام من Google» واجعلها المحرك الافتراضي.",1); }
+  if(mode!=="cloud" && v){
+    if(await localSpeak(text,code,v,seq)) return;
+    if(seq!==speakSeq) return;
+  }
+  note("لم يُنطق الصوت. ارفع صوت الوسائط في الجهاز، ثم افتح «اللغات والإعدادات» واضغط «فحص الصوت» وأرسل لي صورة النتيجة.",1);
 }
 function renderVoiceInfo(){
   const el=$("voiceInfo"); if(!el) return;
@@ -540,6 +553,32 @@ $("flipBtn").onclick=()=>{ state.flip=!state.flip; applyFlip(); save(); };
 $("clearConvo").onclick=()=>{ buildSide("a"); buildSide("b"); setDir(); };
 
 function refreshAll(){ buildSide("a"); buildSide("b"); setDir(); buildText(); renderLangs(); applyFlip(); }
+$("ttsMode").value=state.ttsMode||"auto";
+$("ttsMode").onchange=e=>{ state.ttsMode=e.target.value; forceCloud.clear(); save(); };
+$("ttsTest").onclick=async()=>{
+  unlockAudio();
+  const d=$("diag"); d.hidden=false; const log=t=>{ d.textContent+=t+"\n"; };
+  d.textContent="";
+  log("Browser: "+navigator.userAgent.replace(/.*?\((.*?)\).*/,"$1"));
+  log("Online: "+navigator.onLine+" | Secure: "+window.isSecureContext);
+  const hasTTS="speechSynthesis" in window;
+  if(hasTTS){ try{ voices=speechSynthesis.getVoices()||[]; }catch(e){} }
+  log("Device speech: "+(hasTTS?"yes":"no")+" | voices: "+voices.length);
+  enabled.forEach(c=>{ const v=hasTTS?voiceFor(c):null; log("  "+c+": "+(v?(v.name+" ["+v.lang+"]"):"— no voice")); });
+  const code=state.b||"en", sample=code==="ar"?"مرحبا، هذا اختبار الصوت":"Hello, this is a sound test";
+  if(hasTTS && voiceFor(code)){
+    log("Testing device voice ("+code+")…");
+    const seq=++speakSeq; stopSpeaking();
+    log("  device voice: "+((await localSpeak(sample,code,voiceFor(code),seq))?"STARTED ✔":"did not start ✘"));
+    await sleep(2500);
+  }
+  log("Testing Google voice ("+code+")…");
+  const seq2=++speakSeq; stopSpeaking();
+  const ok=await cloudSpeak(sample,code,seq2);
+  log("  Google voice: "+(ok?"PLAYING ✔":"failed ✘"+(ttsAudio&&ttsAudio.error?" (media error "+ttsAudio.error.code+")":"")));
+  log("Mode: "+(state.ttsMode||"auto"));
+};
+
 fixSel(); refreshAll(); renderHist();
 
 /* keep the screen on during a conversation */
