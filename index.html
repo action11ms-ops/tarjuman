@@ -28,14 +28,14 @@
 [hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
-.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:18px 40px;display:flex;flex-direction:column;gap:16px}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:16px;padding-block:10px 24px;display:flex;flex-direction:column;gap:10px}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-h1{font-family:var(--f-display);font-size:1.6rem;margin:0;letter-spacing:-.01em}
-h1 small{display:block;font-family:var(--f-body);font-size:.8rem;font-weight:400;color:var(--muted)}
+h1{font-family:var(--f-display);font-size:1.25rem;margin:0;letter-spacing:-.01em;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h1 small{display:inline;font-family:var(--f-body);font-size:.8rem;font-weight:400;color:var(--muted)}
 .engine{font-size:.78rem;padding:4px 10px;border-radius:99px;background:var(--sunk);color:var(--muted)}
 .engine b{color:var(--a)}
 .tabs{display:flex;gap:6px;background:var(--sunk);padding:4px;border-radius:12px}
-.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:600 .95rem var(--f-body);padding:10px;border-radius:9px;cursor:pointer}
+.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:600 .9rem var(--f-body);padding:7px;border-radius:9px;cursor:pointer}
 .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px #0002}
 button{font-family:var(--f-body)}
 button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--a);outline-offset:2px}
@@ -43,22 +43,23 @@ select,textarea,input[type=text]{font:inherit;color:var(--ink);background:var(--
 textarea{width:100%;resize:vertical;min-height:84px}
 
 /* conversation */
-.convo{display:flex;flex-direction:column;gap:10px}
-.side{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;--c:var(--a);--cs:var(--a-soft)}
+.convo{display:flex;flex-direction:column;gap:8px}
+@media (min-width:760px){.convo{display:grid;grid-template-columns:1fr 1fr;align-items:start}.convo .mid{grid-column:1/-1;order:-1}.side.flipped{transform:none}}
+.side{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;--c:var(--a);--cs:var(--a-soft)}
 .side.b{--c:var(--b);--cs:var(--b-soft)}
 .side.flipped{transform:rotate(180deg)}
 .side-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .who{font:600 .75rem var(--f-body);letter-spacing:.06em;color:var(--c);background:var(--cs);padding:3px 9px;border-radius:99px}
 .side-top select{flex:1;min-width:140px}
-.bubble{min-height:96px;background:var(--cs);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.bubble{min-height:72px;max-height:34vh;overflow-y:auto;background:var(--cs);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
 .bubble .orig{font-size:.85rem;color:var(--muted);min-height:1.2em}
-.bubble .tr{font-family:var(--f-display);font-size:1.45rem;line-height:1.45;font-weight:500;overflow-wrap:anywhere}
+.bubble .tr{font-family:var(--f-display);font-size:1.3rem;line-height:1.45;font-weight:500;overflow-wrap:anywhere}
 .bubble .tr.placeholder{font-family:var(--f-body);font-size:.95rem;color:var(--muted);font-weight:400}
 .row{display:flex;gap:8px;align-items:stretch}
 .row input{flex:1;min-width:0}
 .btn{border:0;border-radius:10px;padding:10px 14px;font-weight:600;font-size:.9rem;cursor:pointer;background:var(--sunk);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .btn.primary{background:var(--c,var(--a));color:var(--on-accent)}
-.mic{width:56px;height:56px;border-radius:50%;border:0;background:var(--c);color:var(--on-accent);cursor:pointer;display:grid;place-items:center;flex:none}
+.mic{width:48px;height:48px;border-radius:50%;border:0;background:var(--c);color:var(--on-accent);cursor:pointer;display:grid;place-items:center;flex:none}
 .mic svg{width:24px;height:24px}
 .mic.live{animation:pulse 1.2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 55%,transparent)}100%{box-shadow:0 0 0 16px transparent}}
