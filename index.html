@@ -52,7 +52,8 @@ textarea{width:100%;resize:vertical;min-height:84px}
 .who{font:600 .75rem var(--f-body);letter-spacing:.06em;color:var(--c);background:var(--cs);padding:3px 9px;border-radius:99px}
 .side-top select{flex:1;min-width:140px}
 .bubble{min-height:72px;max-height:34vh;overflow-y:auto;background:var(--cs);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
-.bubble .orig{font-size:.85rem;color:var(--muted);min-height:1.2em}
+.bubble .orig{font-size:.85rem;color:var(--muted);min-height:1.2em;flex-shrink:0;overflow-wrap:anywhere}
+.bubble .tr{flex-shrink:0}
 .bubble .tr{font-family:var(--f-display);font-size:1.3rem;line-height:1.45;font-weight:500;overflow-wrap:anywhere}
 .bubble .tr.placeholder{font-family:var(--f-body);font-size:.95rem;color:var(--muted);font-weight:400}
 .row{display:flex;gap:8px;align-items:stretch}
@@ -276,39 +277,45 @@ function renderVoiceInfo(){
 
 /* ---------- speech recognition ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec=null, recBtn=null, srBlocked=false, skipFinal=false;
-function stopRec(){ if(rec){ skipFinal=true; try{rec.stop()}catch(_){} } }
+let rec=null, recBtn=null, srBlocked=false, skipFinal=false, wantStop=false;
+const IS_ANDROID=/Android/i.test(navigator.userAgent);
+function stopRec(){ if(rec){ skipFinal=true; wantStop=true; try{rec.stop()}catch(_){} } }
 function kbVoice(input){
   if(input){ input.focus(); }
-  note("الآن اضغط 🎤 في أعلى لوحة المفاتيح وتحدّث. عندما تتوقف ثانيتين تُترجم كلماتك وتُنطق تلقائياً.");
+  note("الآن اضغط 🎤 في أعلى لوحة المفاتيح وتحدّث، ثم اضغط «ترجم».");
 }
 function listen(code, btn, onInterim, onFinal, input){
-  if(rec){ rec.stop(); return; }
+  if(rec){ wantStop=true; try{rec.stop()}catch(_){} return; }
   if(!SR||srBlocked||!window.isSecureContext){ kbVoice(input); return; }
   try{ speechSynthesis.cancel(); }catch(e){}
-  rec = new SR(); rec.lang = ALL[code].sr; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives=1;
-  let finalText="";
+  let acc="", first=true; wantStop=false; skipFinal=false;
   recBtn=btn; btn.classList.add("live");
-  rec.onresult = e=>{
-    let interim="";
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      const t=e.results[i][0].transcript;
-      if(e.results[i].isFinal) finalText+=t; else interim+=t;
-    }
-    onInterim(finalText+interim);
+  const finish=()=>{ btn.classList.remove("live"); rec=null; if(!skipFinal && acc) onFinal(acc); skipFinal=false; };
+  const startSession=()=>{
+    const r=new SR(); r.lang=ALL[code].sr; r.interimResults=true; r.continuous=false; r.maxAlternatives=1;
+    let sess="";
+    r.onresult=e=>{
+      let t="";
+      if(IS_ANDROID){ t=e.results[e.results.length-1][0].transcript; }
+      else { for(let i=0;i<e.results.length;i++) t+=e.results[i][0].transcript; }
+      sess=t.trim();
+      onInterim((acc+" "+sess).trim());
+    };
+    r.onerror=e=>{
+      if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="audio-capture"){ wantStop=true; srBlocked=true; kbVoice(input); }
+      else if(e.error==="language-not-supported"){ wantStop=true; note("التعرّف الصوتي لا يدعم "+ALL[code].n+" على هذا الجهاز. اكتب النص بدلاً من ذلك.",1); }
+      else if(e.error==="network"){ wantStop=true; note("تعذّر الاستماع: تحقق من الاتصال بالإنترنت.",1); }
+    };
+    r.onstart=()=>{ if(first){ first=false; note("🎙 أستمع الآن بلغة: "+ALL[code].n+" — تكلّم، ثم اضغط «ترجم» عند الانتهاء."); } };
+    r.onend=()=>{
+      if(sess) acc=(acc+" "+sess).trim();
+      sess="";
+      if(!wantStop){ try{ startSession(); return; }catch(_){} }
+      finish();
+    };
+    rec=r; r.start();
   };
-  rec.onerror = e=>{
-    if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="network"||e.error==="audio-capture"){
-      srBlocked=true; kbVoice(input); }
-    else if(e.error==="language-not-supported")
-      note("التعرّف الصوتي لا يدعم "+ALL[code].n+" على هذا الجهاز. اكتب النص بدلاً من ذلك.",1);
-    else if(e.error!=="no-speech"&&e.error!=="aborted") note("تعذّر الاستماع: "+e.error,1);
-  };
-  rec.onend = ()=>{ btn.classList.remove("live"); rec=null; if(!skipFinal && finalText.trim()) onFinal(finalText.trim()); skipFinal=false; };
-  let started=false;
-  rec.onstart=()=>{ started=true; note("🎙 أستمع الآن بلغة: "+ALL[code].n+" — تكلّم، ثم اضغط «ترجم» عند الانتهاء."); };
-  try{ rec.start(); }catch(e){ btn.classList.remove("live"); rec=null; srBlocked=true; kbVoice(input); return; }
-  if(!window.isSecureContext) setTimeout(()=>{ if(!started&&rec){ try{rec.abort()}catch(e){} btn.classList.remove("live"); rec=null; srBlocked=true; kbVoice(input); } },1500);
+  try{ startSession(); }catch(e){ btn.classList.remove("live"); rec=null; srBlocked=true; kbVoice(input); }
 }
 
 /* ---------- conversation ---------- */
